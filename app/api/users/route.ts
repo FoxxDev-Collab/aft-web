@@ -22,7 +22,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const allUsers = await db.select({
+    // Support including inactive/archived users via query param (admin only)
+    const url = new URL(request.url);
+    const includeInactiveParam = url.searchParams.get('includeInactive') || url.searchParams.get('includeArchived') || url.searchParams.get('status');
+    const includeInactive = (includeInactiveParam?.toLowerCase() === 'true') 
+      || (includeInactiveParam?.toLowerCase() === '1') 
+      || (includeInactiveParam?.toLowerCase() === 'all') 
+      || false;
+
+    // Build query; by default or for non-admins, only return active users
+    const baseQuery = db.select({
       id: users.id,
       email: users.email,
       firstName: users.firstName,
@@ -33,7 +42,11 @@ export async function GET(request: NextRequest) {
       isActive: users.isActive,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
-    }).from(users).where(eq(users.isActive, true)).orderBy(desc(users.createdAt));
+    }).from(users);
+
+    const shouldFilterActiveOnly = (!includeInactive) || (!isAdmin(currentUser));
+    const queryWithFilter = shouldFilterActiveOnly ? baseQuery.where(eq(users.isActive, true)) : baseQuery;
+    const allUsers = await queryWithFilter.orderBy(desc(users.createdAt));
 
     // Get roles for each user
     const usersWithRoles = await Promise.all(
