@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     // Create audit log entry
     await db().insert(aftAuditLog).values({
-      requestId: 0, // No specific request for drive tracking
+      requestId: null, // No specific request for drive tracking
       userId: user.id,
       action: 'drive_issued',
       notes: `Drive ${drive[0].serialNumber} issued to user ${userId} for transfer from ${sourceIS} to ${destinationIS}`,

@@ -171,7 +171,7 @@ export const aftAttachments = sqliteTable('aft_attachments', {
 // Audit log table for tracking changes
 export const aftAuditLog = sqliteTable('aft_audit_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  requestId: integer('request_id').notNull().references(() => aftRequests.id, { onDelete: 'cascade' }),
+  requestId: integer('request_id').references(() => aftRequests.id, { onDelete: 'cascade' }),
   userId: integer('user_id').notNull().references(() => users.id),
   action: text('action').notNull(), // created, updated, approved, rejected, etc.
   oldStatus: text('old_status'),

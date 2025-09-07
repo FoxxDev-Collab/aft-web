@@ -79,7 +79,7 @@ interface RequestData {
 
 interface User {
   id: number;
-  role: string;
+  primaryRole: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -114,7 +114,7 @@ export default function ApproverRequestDetailPage() {
       if (userResponse.ok) {
         const userData = await userResponse.json();
         console.log('User data:', userData); // Debug log
-        setUser(userData);
+        setUser(userData.user);
       }
 
       if (!requestResponse.ok) {
@@ -189,7 +189,10 @@ export default function ApproverRequestDetailPage() {
     }
   };
 
-  const getRoleTitle = (role: string) => {
+  const getRoleTitle = (role: string | undefined | null) => {
+    if (typeof role !== 'string' || !role.trim()) {
+      return 'Approver'; // Default text if role is not a valid string
+    }
     switch (role.toLowerCase()) {
       case 'dao': return 'Designated Authorizing Official';
       case 'approver': return 'Information System Security Manager';
@@ -231,7 +234,7 @@ export default function ApproverRequestDetailPage() {
           signature: signature.trim(),
           date: new Date().toISOString(),
           acknowledgeTerms,
-          approverRole: user?.role
+          approverRole: user?.primaryRole
         })
       });
 
@@ -310,7 +313,7 @@ export default function ApproverRequestDetailPage() {
     return 'normal';
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -339,7 +342,7 @@ export default function ApproverRequestDetailPage() {
     );
   }
 
-  const canTakeAction = canApproveRequest(request.status, user?.role || '');
+  const canTakeAction = canApproveRequest(request.status, user?.primaryRole || '');
   const urgency = getUrgencyLevel(request.classification, request.createdAt);
 
   return (
@@ -358,7 +361,7 @@ export default function ApproverRequestDetailPage() {
               <Shield className="w-6 h-6 text-primary" />
               <span>AFT Request Review</span>
             </h1>
-            <p className="text-muted-foreground">{user ? getRoleTitle(user.role) : 'Approver'} Assessment Required</p>
+            <p className="text-muted-foreground">{user && user.primaryRole ? `${getRoleTitle(user.primaryRole)} Assessment Required` : 'Approver Assessment Required'}</p>
           </div>
         </div>
         <Button variant="outline" onClick={fetchRequest} className="flex items-center space-x-2">
@@ -698,7 +701,7 @@ export default function ApproverRequestDetailPage() {
                   <span>Decision Required</span>
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {getRoleTitle(user?.role || '')} approval needed
+                  {getRoleTitle(user?.primaryRole || '')} approval needed
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -837,13 +840,13 @@ export default function ApproverRequestDetailPage() {
               <span>Approve AFT Request</span>
             </DialogTitle>
             <DialogDescription>
-              You are about to approve AFT Request {request.requestNumber} as {getRoleTitle(user?.role || '')}.
+              You are about to approve AFT Request {request.requestNumber} as {getRoleTitle(user?.primaryRole || '')}.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="signature">Digital Signature *</Label>
+              <Label htmlFor="signature">{user ? getRoleTitle(user.primaryRole) : 'Approver'} Signature</Label>
               <Input
                 id="signature"
                 value={signature}
@@ -860,7 +863,7 @@ export default function ApproverRequestDetailPage() {
                 onCheckedChange={(checked) => setAcknowledgeTerms(checked as boolean)}
               />
               <Label htmlFor="acknowledge" className="text-sm">
-                I acknowledge that I have reviewed this request thoroughly and approve it under my authority as {getRoleTitle(user?.role || '')}.
+                I acknowledge that I have reviewed this request thoroughly and approve it under my authority as {getRoleTitle(user?.primaryRole || '')}.
               </Label>
             </div>
           </div>

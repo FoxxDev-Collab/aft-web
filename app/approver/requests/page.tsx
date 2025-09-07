@@ -44,7 +44,7 @@ interface AFTRequest {
 
 interface User {
   id: number;
-  role: string;
+  primaryRole: string;
   firstName: string;
   lastName: string;
 }
@@ -58,7 +58,10 @@ export default function ApproverRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [classificationFilter, setClassificationFilter] = useState('all');
 
-  const getRoleTitle = (role: string) => {
+  const getRoleTitle = (role: string | undefined | null) => {
+    if (typeof role !== 'string' || !role.trim()) {
+      return 'Approver'; // Default text if role is not a valid string
+    }
     switch (role.toLowerCase()) {
       case 'dao': return 'Designated Authorizing Official';
       case 'approver': return 'Information System Security Manager';
@@ -81,7 +84,7 @@ export default function ApproverRequestsPage() {
       let userData = null;
       if (userResponse.ok) {
         userData = await userResponse.json();
-        setUser(userData);
+        setUser(userData.user);
       }
       
       if (requestsResponse.ok) {
@@ -92,7 +95,7 @@ export default function ApproverRequestsPage() {
         let relevantRequests = allRequests;
         
         if (userData) {
-          const userRole = userData.role;
+          const userRole = userData.primaryRole;
           
           if (userRole === 'dao') {
             relevantRequests = allRequests.filter((r: AFTRequest) => 
@@ -216,7 +219,7 @@ export default function ApproverRequestsPage() {
     return 'normal';
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex items-center space-x-2">
@@ -233,10 +236,10 @@ export default function ApproverRequestsPage() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold text-foreground">
-            {user ? getRoleTitle(user.role) : 'Approver'} Review
+            {user ? getRoleTitle(user.primaryRole) : 'Approver'} Review
           </h1>
           <p className="text-muted-foreground mt-1">
-            Review and approve AFT requests requiring {user ? getRoleTitle(user.role) : 'your'} approval
+            Review and approve AFT requests requiring {user ? getRoleTitle(user.primaryRole) : 'your'} approval
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -308,7 +311,7 @@ export default function ApproverRequestsPage() {
           <CardDescription>
             {filteredRequests.length === 0 && requests.length > 0
               ? 'No requests match your current filters'
-              : `AFT requests requiring ${user ? getRoleTitle(user.role) : 'your'} approval`
+              : `AFT requests requiring ${user ? getRoleTitle(user.primaryRole) : 'your'} approval`
             }
           </CardDescription>
         </CardHeader>
