@@ -22,7 +22,8 @@ interface FormData {
   justificationForTransfer: string;
   
   // File Details
-  uploadedFiles: File[];
+  numberOfFiles: number;
+  fileDescription: string;
   additionalFileListAttached: boolean;
   
   // Media Transportation
@@ -177,7 +178,7 @@ export function ReviewSubmitStep({ data }: ReviewSubmitStepProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Number of Files</p>
-              <p className="text-lg font-semibold text-foreground">{data.uploadedFiles.length}</p>
+              <p className="text-lg font-semibold text-foreground">{data.numberOfFiles}</p>
             </div>
             {data.additionalFileListAttached && (
               <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -187,24 +188,12 @@ export function ReviewSubmitStep({ data }: ReviewSubmitStepProps) {
           </div>
           
           <div className="space-y-3">
-            {data.uploadedFiles.map((file, index) => (
-              <div key={index} className="border rounded-lg p-3 bg-muted/50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Name</p>
-                    <p className="text-sm text-foreground">{file.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Type</p>
-                    <p className="text-sm text-foreground">{file.type}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Size</p>
-                    <p className="text-sm text-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                </div>
+            <div className="border rounded-lg p-3 bg-muted/50">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">File Description</p>
+                <p className="text-sm text-foreground">{data.fileDescription}</p>
               </div>
-            ))}
+            </div>
           </div>
         </CardContent>
       </Card>

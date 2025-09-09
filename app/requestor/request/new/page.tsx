@@ -34,7 +34,8 @@ interface FormData {
   justificationForTransfer: string;
   
   // File Details
-  uploadedFiles: File[];
+  numberOfFiles: number;
+  fileDescription: string;
   additionalFileListAttached: boolean;
   
   // Media Transportation
@@ -65,7 +66,8 @@ const initialFormData: FormData = {
   justificationForTransfer: '',
   
   // File Details
-  uploadedFiles: [],
+  numberOfFiles: 0,
+  fileDescription: '',
   additionalFileListAttached: false,
   
   // Media Transportation
@@ -79,7 +81,7 @@ const initialFormData: FormData = {
 const steps = [
   { title: 'Media Control', description: 'Media control number and type' },
   { title: 'Source & Destination', description: 'Information systems and classification' },
-  { title: 'File Upload', description: 'Upload files and transfer information' },
+  { title: 'File Details', description: 'File count and description information' },
   { title: 'Media Transportation', description: 'Transportation and encryption details' },
   { title: 'Review & Submit', description: 'Final review and submission' },
 ];
@@ -100,8 +102,8 @@ export default function NewRequestPage() {
         return !!(formData.mediaControlNumber && formData.mediaType);
       case 1: // Source & Destination
         return !!(formData.sourceIS && formData.sourceISClassification && formData.destinationIS && formData.destinationISClassification && formData.overallClassification && formData.transferType && formData.destinationFile && formData.justificationForTransfer);
-      case 2: // File Upload
-        return formData.uploadedFiles.length > 0;
+      case 2: // File Details
+        return formData.numberOfFiles > 0 && formData.fileDescription.trim() !== '';
       case 3: // Media Transportation
         return !formData.mediaTransportedOutside || !!(formData.mediaDestination && formData.destinationPOC && formData.destinationAddress);
       default:
@@ -133,103 +135,30 @@ export default function NewRequestPage() {
 
     setIsSubmitting(true);
     try {
-      const { uploadedFiles, ...requestData } = formData;
+      toast.info('Saving request...');
       
-      // If there are files to upload, upload them first, then save the request
-      if (uploadedFiles.length > 0) {
-        toast.info('Uploading files and saving request...');
-        
-        // First save the request as draft to get request ID
-        const submitData = {
-          ...requestData,
-          numberOfFiles: uploadedFiles.length,
-          files: uploadedFiles.map(file => ({
-            name: file.name,
-            fileType: file.type,
-            classification: 'unclassified'
-          })),
-          tpiRequired: true,
-        };
+      // Save the request with file details (no actual file upload)
+      const submitData = {
+        ...formData,
+        numberOfFiles: formData.numberOfFiles,
+        files: [], // No actual files, just metadata
+        tpiRequired: true,
+      };
 
-        const response = await fetch('/api/aft-requests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(submitData),
-        });
+      const response = await fetch('/api/aft-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData),
+      });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to save request');
-        }
-
-        const result = await response.json();
-        const requestId = result.request.id;
-        
-        // Now upload all files - if any fail, delete the request
-        const uploadErrors = [];
-        let successfulUploads = 0;
-        
-        for (const file of uploadedFiles) {
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('requestId', requestId.toString());
-
-            const uploadResponse = await fetch('/api/files/upload', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (uploadResponse.ok) {
-              successfulUploads++;
-            } else {
-              const error = await uploadResponse.json();
-              uploadErrors.push(`${file.name}: ${error.error || 'Upload failed'}`);
-            }
-          } catch (error) {
-            uploadErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Upload failed'}`);
-          }
-        }
-        
-        // If any files failed to upload, delete the request and show error
-        if (uploadErrors.length > 0) {
-          try {
-            await fetch(`/api/aft-requests/${requestId}`, { method: 'DELETE' });
-          } catch (e) {
-            console.error('Failed to cleanup request after upload failure:', e);
-          }
-          
-          toast.error(`Failed to upload files: ${uploadErrors.join(', ')}`);
-          return;
-        }
-        
-        toast.success(`AFT request saved with all ${successfulUploads} file(s) uploaded successfully!`);
-      } else {
-        // No files to upload, just save the request
-        const submitData = {
-          ...requestData,
-          numberOfFiles: 0,
-          files: [],
-          tpiRequired: true,
-        };
-
-        const response = await fetch('/api/aft-requests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(submitData),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to save request');
-        }
-
-        toast.success('AFT request saved as draft successfully!');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save request');
       }
+
+      toast.success('AFT request saved as draft successfully!');
       
       router.push('/requestor/requests');
     } catch (error) {

@@ -20,6 +20,14 @@ interface FileDetail {
   classification: string;
 }
 
+interface FileEntry {
+  id: string;
+  fileName: string;
+  fileType: string;
+  classification: string;
+  description: string;
+}
+
 interface FormData {
   // Section I: Media Control Number and Media Type
   mediaControlNumber: string;
@@ -40,7 +48,9 @@ interface FormData {
   
   // File Details
   numberOfFiles: number;
+  fileDescription: string;
   files: FileDetail[];
+  manualFiles?: FileEntry[];
   additionalFileListAttached: boolean;
   uploadedFiles: File[];
   
@@ -50,6 +60,9 @@ interface FormData {
   destinationPOC: string;
   destinationAddress: string;
   mediaEncrypted: boolean;
+  
+  // Index signature for compatibility
+  [key: string]: unknown;
 }
 
 interface RequestData {
@@ -97,7 +110,9 @@ const initialFormData: FormData = {
   
   // File Details
   numberOfFiles: 1,
+  fileDescription: '',
   files: [{ name: '', fileType: '', classification: '' }],
+  manualFiles: [],
   additionalFileListAttached: false,
   uploadedFiles: [],
   
@@ -150,6 +165,7 @@ export default function EditRequestPage() {
       
       // File details - create default structure
       numberOfFiles: 1,
+      fileDescription: request.dataDescription || '',
       files: [{ 
         name: request.dataDescription || 'Data files', 
         fileType: request.dataFormat || '', 
@@ -311,7 +327,7 @@ export default function EditRequestPage() {
       case 2:
         return <FileDetailsStep data={formData} updateData={updateFormData} />;
       case 3:
-        return <FileUploadStep updateData={updateFormData} requestId={parseInt(params.id as string)} />;
+        return <FileUploadStep data={formData} updateData={updateFormData} />;
       case 4:
         return <MediaTransportationStep data={formData} updateData={updateFormData} />;
       case 5:

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-server';
-import { db as getDb } from '@/lib/db';
-import { aftRequests, AFTStatusType } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db/raw';
+import { AFTStatusType } from '@/lib/db/schema';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -46,9 +45,14 @@ export async function POST(
     }
 
     // Get the request first to check transfer type
-    const db = getDb();
-    const result = await db.select().from(aftRequests).where(eq(aftRequests.id, requestId)).limit(1);
-    const aftRequest = result[0] || null;
+    const stmt = db.prepare('SELECT * FROM aft_requests WHERE id = ? LIMIT 1');
+    const aftRequest = stmt.get(requestId) as {
+      id: number;
+      status: string;
+      transferType: string;
+      requestNumber: string;
+      approvalData: string | null;
+    } | undefined;
 
     if (!aftRequest) {
       return NextResponse.json(
@@ -169,20 +173,26 @@ export async function POST(
     console.log(`Next status determined: ${nextStatus}`);
 
     // Update the request
-    const updatedRequest = await db
-      .update(aftRequests)
-      .set({
-        status: nextStatus as AFTStatusType,
-        updatedAt: new Date(),
-        approvalData: JSON.stringify(existingApprovalData),
-      })
-      .where(eq(aftRequests.id, requestId))
-      .returning();
+    const updateStmt = db.prepare(`
+      UPDATE aft_requests 
+      SET status = ?, updated_at = ?, approval_data = ?
+      WHERE id = ?
+    `);
+    
+    updateStmt.run(
+      nextStatus,
+      new Date().toISOString(),
+      JSON.stringify(existingApprovalData),
+      requestId
+    );
+    
+    // Get the updated request
+    const updatedRequest = stmt.get(requestId);
 
     return NextResponse.json({
       success: true,
       message: 'Request approved successfully',
-      request: updatedRequest[0],
+      request: updatedRequest,
     });
 
   } catch (error) {

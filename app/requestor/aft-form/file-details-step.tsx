@@ -1,11 +1,13 @@
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
-import { SimpleFileUpload } from '@/components/simple-file-upload';
 
 interface FormData {
-  uploadedFiles: File[];
+  numberOfFiles: number;
+  fileDescription: string;
   additionalFileListAttached: boolean;
 }
 
@@ -15,23 +17,42 @@ interface FileDetailsStepProps {
 }
 
 export function FileDetailsStep({ data, updateData }: FileDetailsStepProps) {
-  const handleFilesChange = (files: File[]) => {
-    updateData({ uploadedFiles: files });
-  };
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            File Upload and Transfer Information
+            File Transfer Information
           </CardTitle>
           <CardDescription>
-            Upload the files to be transferred. File details will be automatically detected.
+            Provide details about the files to be transferred. File upload functionality has been disabled.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="numberOfFiles">Number of Files</Label>
+            <Input
+              id="numberOfFiles"
+              type="number"
+              min="1"
+              value={data.numberOfFiles || ''}
+              onChange={(e) => updateData({ numberOfFiles: parseInt(e.target.value) || 0 })}
+              placeholder="Enter number of files"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="fileDescription">File Description</Label>
+            <Textarea
+              id="fileDescription"
+              value={data.fileDescription || ''}
+              onChange={(e) => updateData({ fileDescription: e.target.value })}
+              placeholder="Describe the files to be transferred (names, types, purposes, etc.)"
+              rows={4}
+            />
+          </div>
+          
           <div className="flex items-center space-x-2">
             <Checkbox
               id="additionalFileListAttached"
@@ -45,21 +66,14 @@ export function FileDetailsStep({ data, updateData }: FileDetailsStepProps) {
         </CardContent>
       </Card>
 
-      <SimpleFileUpload
-        onFilesChange={handleFilesChange}
-        initialFiles={data.uploadedFiles || []}
-        maxFiles={10}
-      />
-
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 className="font-medium text-green-900 mb-2">File Upload Guidelines</h4>
-        <ul className="text-sm text-green-800 space-y-1">
-          <li>• Upload all files that will be included in this transfer</li>
-          <li>• Files are automatically validated for type and size limits</li>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 mb-2">File Transfer Guidelines</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Provide accurate count and description of files to be transferred</li>
+          <li>• File names should not contain sensitive or classified information</li>
           <li>• If you have more than 10 files, check &quot;Additional File List(s) Attached&quot;</li>
           <li>• Executable files require additional security review and approval</li>
-          <li>• File names should not contain sensitive or classified information</li>
-          <li>• All files will be stored securely and only accessible to authorized personnel</li>
+          <li>• All file details will be reviewed by security personnel before transfer</li>
         </ul>
       </div>
     </div>

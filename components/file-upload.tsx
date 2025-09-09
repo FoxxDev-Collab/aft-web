@@ -7,13 +7,12 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { 
   Upload, 
-  File, 
   X, 
-  CheckCircle,
-  FileText,
+  FileText, 
   Image,
+  FileSpreadsheet,
   Archive,
-  FileSpreadsheet
+  File
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -226,10 +225,14 @@ export function FileUpload({ requestId, onFilesChange, initialFiles = [], disabl
                     <p className="text-xs text-muted-foreground">
                       {formatFileSize(file.fileSize)} • {new Date(file.createdAt).toLocaleDateString()}
                     </p>
+                    <img
+                      src={`/api/files/preview/${file.id}`}
+                      alt={`Preview of ${file.originalName}`}
+                      className="w-full h-32 object-cover rounded"
+                    />
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
                   {!disabled && (
                     <Button
                       type="button"

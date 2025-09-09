@@ -17,14 +17,13 @@ import {
   LogOut, 
   Settings, 
   FileText, 
-  Users, 
   CheckCircle, 
   Send,
   Menu,
   X,
   Archive,
   History,
-  BookOpen
+  Users
 } from 'lucide-react';
 import { AuthUser } from '@/lib/auth';
 
@@ -153,12 +152,6 @@ export function DashboardNav({ user }: DashboardNavProps) {
                   <Link href="/profile">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Profile Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/user-guides">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    <span>User Guides</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

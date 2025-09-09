@@ -1,105 +1,203 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileUpload } from '@/components/file-upload';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Plus, X } from 'lucide-react';
+
+interface FileEntry {
+  id: string;
+  fileName: string;
+  fileType: string;
+  classification: string;
+  description: string;
+}
 
 interface FileUploadStepProps {
-  data: Record<string, unknown>;
+  data: {
+    manualFiles?: FileEntry[];
+    [key: string]: unknown;
+  };
   updateData: (updates: Record<string, unknown>) => void;
   requestId?: number | null;
 }
 
-interface UploadedFile {
-  id: number;
-  fileName: string;
-  originalName: string;
-  fileSize: number;
-  mimeType: string;
-  createdAt: number;
-}
-
-export function FileUploadStep({ updateData, requestId }: Omit<FileUploadStepProps, 'data'>) {
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-
-  const loadExistingFiles = useCallback(async (): Promise<void> => {
-    if (!requestId) return;
-
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const response = await fetch(`/api/files/list/${requestId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setFiles(result.files);
-      }
-    } catch (error) {
-      console.error('Failed to load existing files:', error);
-    }
-  }, [requestId]);
+export function FileUploadStep({ data, updateData }: Omit<FileUploadStepProps, 'requestId'>) {
+  const [files, setFiles] = useState<FileEntry[]>(data.manualFiles || []);
 
   useEffect(() => {
-    // Load existing files if we have a request ID (editing mode)
-    if (requestId) {
-      loadExistingFiles();
-    }
-  }, [requestId, loadExistingFiles]);
-
-  const handleFilesChange = (newFiles: UploadedFile[]) => {
-    setFiles(newFiles);
-    // Update form data to include file information
     updateData({ 
-      uploadedFiles: newFiles,
-      numberOfFiles: newFiles.length 
+      manualFiles: files,
+      numberOfFiles: files.length 
     });
+  }, [files, updateData]);
+
+  const addFile = () => {
+    const newFile: FileEntry = {
+      id: Date.now().toString(),
+      fileName: '',
+      fileType: '',
+      classification: '',
+      description: ''
+    };
+    setFiles([...files, newFile]);
   };
 
-  // Show message if no requestId (new request that hasn't been saved yet)
-  const needsSaveFirst = !requestId;
+  const updateFile = (id: string, field: keyof FileEntry, value: string) => {
+    setFiles(files.map(file => 
+      file.id === id ? { ...file, [field]: value } : file
+    ));
+  };
+
+  const removeFile = (id: string) => {
+    setFiles(files.filter(file => file.id !== id));
+  };
+
+  const classificationOptions = [
+    'UNCLASSIFIED',
+    'CUI',
+    'CONFIDENTIAL',
+    'SECRET',
+    'TOP SECRET'
+  ];
+
+  const fileTypeOptions = [
+    'Document (.doc, .docx, .pdf)',
+    'Spreadsheet (.xls, .xlsx, .csv)',
+    'Image (.jpg, .png, .gif)',
+    'Archive (.zip, .rar, .7z)',
+    'Text (.txt, .log)',
+    'Database (.db, .sql)',
+    'Executable (.exe, .msi)',
+    'Other'
+  ];
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>File Upload</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            File Information
+          </CardTitle>
           <CardDescription>
-            Upload the files that need to be transferred. Files will be securely stored and made available to the DTA.
+            Manually specify the files that will be transferred. Provide detailed information for each file.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {needsSaveFirst ? (
+        <CardContent className="space-y-4">
+          {files.length === 0 ? (
             <div className="text-center py-8">
-              <div className="bg-muted/50 rounded-lg p-6">
-                <h3 className="font-semibold text-foreground mb-2">Save Request First</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  You need to save your request as a draft before you can upload files.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Click &ldquo;Save as Draft&rdquo; in the review step to enable file uploads.
-                </p>
-              </div>
+              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground mb-4">No files specified yet</p>
+              <Button onClick={addFile} variant="outline">
+                <Plus className="w-4 h-4 mr-2" />
+                Add File
+              </Button>
             </div>
           ) : (
-            <FileUpload
-              requestId={requestId}
-              onFilesChange={handleFilesChange}
-              initialFiles={files}
-            />
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{files.length} file{files.length !== 1 ? 's' : ''}</Badge>
+                </div>
+                <Button onClick={addFile} size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add File
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {files.map((file, index) => (
+                  <Card key={file.id} className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <h4 className="font-medium">File {index + 1}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(file.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`fileName-${file.id}`}>File Name *</Label>
+                        <Input
+                          id={`fileName-${file.id}`}
+                          value={file.fileName}
+                          onChange={(e) => updateFile(file.id, 'fileName', e.target.value)}
+                          placeholder="e.g., document.pdf"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`fileType-${file.id}`}>File Type *</Label>
+                        <Select
+                          value={file.fileType}
+                          onValueChange={(value) => updateFile(file.id, 'fileType', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select file type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fileTypeOptions.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`classification-${file.id}`}>Classification *</Label>
+                        <Select
+                          value={file.classification}
+                          onValueChange={(value) => updateFile(file.id, 'classification', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select classification" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {classificationOptions.map((classification) => (
+                              <SelectItem key={classification} value={classification}>
+                                {classification}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2 md:col-span-1">
+                        <Label htmlFor={`description-${file.id}`}>Description</Label>
+                        <Textarea
+                          id={`description-${file.id}`}
+                          value={file.description}
+                          onChange={(e) => updateFile(file.id, 'description', e.target.value)}
+                          placeholder="Brief description of file contents and purpose"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
-      {/* File Summary */}
       {files.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Upload Summary</CardTitle>
+            <CardTitle>File Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -109,27 +207,52 @@ export function FileUploadStep({ updateData, requestId }: Omit<FileUploadStepPro
                 {files.length}
               </div>
               <div>
-                <span className="font-medium">Total Size:</span>
+                <span className="font-medium">Complete Entries:</span>
                 <br />
-                {formatFileSize(files.reduce((sum, f) => sum + f.fileSize, 0))}
+                {files.filter(f => f.fileName && f.fileType && f.classification).length}
               </div>
               <div>
-                <span className="font-medium">Last Upload:</span>
+                <span className="font-medium">Highest Classification:</span>
                 <br />
-                {files.length > 0 ? new Date(Math.max(...files.map(f => f.createdAt))).toLocaleDateString() : 'None'}
+                {files.length > 0 ? getHighestClassification(files) : 'None'}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 mb-2">File Information Guidelines</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Provide accurate file names and types for each file to be transferred</li>
+          <li>• Ensure classification levels are correctly specified</li>
+          <li>• Include descriptions to help reviewers understand file contents</li>
+          <li>• All required fields (*) must be completed before submission</li>
+        </ul>
+      </div>
     </div>
   );
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+function getHighestClassification(files: FileEntry[]): string {
+  const classificationLevels = {
+    'UNCLASSIFIED': 0,
+    'CUI': 1,
+    'CONFIDENTIAL': 2,
+    'SECRET': 3,
+    'TOP SECRET': 4
+  };
+
+  let highest = 'UNCLASSIFIED';
+  let highestLevel = 0;
+
+  files.forEach(file => {
+    const level = classificationLevels[file.classification as keyof typeof classificationLevels];
+    if (level > highestLevel) {
+      highest = file.classification;
+      highestLevel = level;
+    }
+  });
+
+  return highest;
 }

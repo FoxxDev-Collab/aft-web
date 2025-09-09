@@ -13,18 +13,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { 
+  Users, 
+  Shield, 
+  FileText, 
+  Settings, 
   User, 
   LogOut, 
-  Settings, 
-  FileText, 
-  Users, 
-  Shield,
   Menu,
   X,
   Sun,
   Moon,
   Monitor,
-  BookOpen
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
@@ -75,7 +74,6 @@ export function AdminNav({ user }: AdminNavProps) {
     { href: '/admin?section=request-lifecycle', label: 'Request Lifecycle', icon: FileText },
     { href: '/admin?section=system-monitoring', label: 'System Health', icon: Settings },
     { href: '/admin?section=user-management', label: 'User Management', icon: Users },
-    { href: '/admin?section=user-guides', label: 'User Guides', icon: BookOpen },
   ];
 
   const ThemeToggle = () => {
@@ -164,12 +162,6 @@ export function AdminNav({ user }: AdminNavProps) {
                   <Link href="/profile">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Account Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/user-guides">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    <span>User Guides</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
