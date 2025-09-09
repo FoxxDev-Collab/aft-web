@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Disc, HardDrive } from 'lucide-react';
 import { DriveInventory } from '@/lib/db/schema';
 
 interface FormData {
+  selectedDriveId?: number;
+  dtaSelected: boolean;
   mediaControlNumber: string;
   mediaType: 'CD-R' | 'DVD-R' | 'DVD-RDL' | 'SSD' | 'SSD-T' | '';
-  selectedDriveId?: number;
 }
 
 interface IssuedDrive extends DriveInventory {
@@ -29,25 +29,27 @@ interface MediaControlStepProps {
 }
 
 export function MediaControlStep({ data, updateData }: MediaControlStepProps) {
-  const [issuedDrives, setIssuedDrives] = useState<IssuedDrive[]>([]);
-  const [loadingDrives, setLoadingDrives] = useState(false);
+  const [selectedDrive, setSelectedDrive] = useState<IssuedDrive | null>(null);
+  const [loadingDrive, setLoadingDrive] = useState(false);
 
   useEffect(() => {
-    fetchIssuedDrives();
-  }, []);
+    if (data.selectedDriveId) {
+      fetchSelectedDrive(data.selectedDriveId);
+    }
+  }, [data.selectedDriveId]);
 
-  const fetchIssuedDrives = async () => {
+  const fetchSelectedDrive = async (driveId: number) => {
     try {
-      setLoadingDrives(true);
-      const response = await fetch('/api/drives/issued');
+      setLoadingDrive(true);
+      const response = await fetch(`/api/drives/${driveId}`);
       if (response.ok) {
-        const drives = await response.json();
-        setIssuedDrives(drives);
+        const drive = await response.json();
+        setSelectedDrive(drive);
       }
     } catch (error) {
-      console.error('Error fetching issued drives:', error);
+      console.error('Error fetching drive details:', error);
     } finally {
-      setLoadingDrives(false);
+      setLoadingDrive(false);
     }
   };
 
@@ -75,97 +77,82 @@ export function MediaControlStep({ data, updateData }: MediaControlStepProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <Label htmlFor="mediaControlNumber">Media Control Number *</Label>
-            <Select
-              value={data.mediaControlNumber}
-              onValueChange={(value) => {
-                // When a drive is selected, also set the selectedDriveId and auto-select media type
-                const selectedDrive = issuedDrives.find(d => d.mediaController === value);
-                if (selectedDrive) {
-                  handleInputChange('mediaControlNumber', value);
-                  handleInputChange('selectedDriveId', selectedDrive.id);
-                  // Auto-select media type from the drive's actual media type
-                  handleInputChange('mediaType', selectedDrive.mediaType);
-                } else {
-                  handleInputChange('mediaControlNumber', value);
-                }
-              }}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder={loadingDrives ? "Loading drives..." : "Select media control number"} />
-              </SelectTrigger>
-              <SelectContent>
-                {issuedDrives.length === 0 && !loadingDrives ? (
-                  <SelectItem value="no-drives" disabled>
-                    No drives currently issued. Contact the custodian to request a drive.
-                  </SelectItem>
-                ) : (
-                  issuedDrives.map((drive) => (
-                    <SelectItem key={drive.id} value={drive.mediaController}>
-                      <div className="flex flex-col min-w-0 w-full">
-                        <span className="font-medium">{drive.mediaController} - {drive.serialNumber}</span>
-                        <span className="text-xs text-muted-foreground">
-                          Issued to: {drive.userFirstName} {drive.userLastName} | {drive.capacity} | {drive.classification}
-                        </span>
+          {!data.dtaSelected ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 border-2 border-yellow-600 rounded-full flex items-center justify-center mt-0.5">
+                  <span className="text-xs font-bold text-yellow-600">!</span>
+                </div>
+                <div className="text-sm text-yellow-800">
+                  <strong>DTA Selection Required:</strong> Please go back to Step 1 and select your Data Transfer Agent (DTA) first. 
+                  The media control number and type will be automatically configured based on your DTA selection.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <Label htmlFor="mediaControlNumber">Media Control Number *</Label>
+                <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center gap-2">
+                    {getMediaIcon()}
+                    <span className="font-medium text-green-800">{data.mediaControlNumber}</span>
+                    <span className="text-sm text-green-600">(Auto-assigned from DTA)</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Media control number automatically assigned from your selected DTA.
+                </p>
+              </div>
+              
+              {selectedDrive && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-800 mb-3">Selected DTA Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-blue-800">Serial Number:</span>
+                      <br />
+                      <span className="text-blue-700">{selectedDrive.serialNumber}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Capacity:</span>
+                      <br />
+                      <span className="text-blue-700">{selectedDrive.capacity}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Classification:</span>
+                      <br />
+                      <span className="text-blue-700">{selectedDrive.classification}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-800">Media Type:</span>
+                      <br />
+                      <div className="flex items-center gap-1 text-blue-700">
+                        {getMediaIcon()}
+                        {selectedDrive.mediaType}
                       </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Select from drives currently issued by the custodian. This determines your DTA assignment.
-            </p>
-          </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
-          <div>
-            <Label htmlFor="mediaType">Media Type *</Label>
-            <Select
-              value={data.mediaType}
-              onValueChange={(value) => handleInputChange('mediaType', value)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select media type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CD-R">
-                  <div className="flex items-center gap-2">
-                    <Disc className="w-4 h-4" />
-                    CD-R (Compact Disc Recordable)
-                  </div>
-                </SelectItem>
-                <SelectItem value="DVD-R">
-                  <div className="flex items-center gap-2">
-                    <Disc className="w-4 h-4" />
-                    DVD-R (DVD Recordable)
-                  </div>
-                </SelectItem>
-                <SelectItem value="DVD-RDL">
-                  <div className="flex items-center gap-2">
-                    <Disc className="w-4 h-4" />
-                    DVD-RDL (DVD Recordable Dual Layer)
-                  </div>
-                </SelectItem>
-                <SelectItem value="SSD">
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4" />
-                    SSD (Solid State Drive)
-                  </div>
-                </SelectItem>
-                <SelectItem value="SSD-T">
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4" />
-                    SSD-T (Solid State Drive - Trusted)
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Select the physical media type that will be used for this transfer
-            </p>
-          </div>
-
+          {data.dtaSelected && (
+            <div>
+              <Label htmlFor="mediaType">Media Type *</Label>
+              <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex items-center gap-2">
+                  {getMediaIcon()}
+                  <span className="font-medium text-green-800">{data.mediaType}</span>
+                  <span className="text-sm text-green-600">(Auto-assigned from DTA)</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Media type automatically assigned from your selected DTA.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

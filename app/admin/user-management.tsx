@@ -643,14 +643,19 @@ export function UserManagement() {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      <Badge className={getRoleBadgeColor(user.role)} variant="default">
-                        {user.role.toUpperCase().replace('_', ' ')} (Primary)
-                      </Badge>
+                      {user.role && (
+                        <Badge className={getRoleBadgeColor(user.role)} variant="default">
+                          {user.role.toUpperCase().replace('_', ' ')} (Primary)
+                        </Badge>
+                      )}
                       {user.roles?.filter(role => role !== user.role).map((role) => (
                         <Badge key={role} className={getRoleBadgeColor(role)} variant="outline">
                           {role.toUpperCase().replace('_', ' ')}
                         </Badge>
                       ))}
+                      {!user.role && !user.roles?.length && (
+                        <Badge variant="secondary">No Role Assigned</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{user.organization || '-'}</TableCell>
@@ -769,14 +774,19 @@ export function UserManagement() {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      <Badge className={getRoleBadgeColor(user.role)} variant="outline">
-                        {user.role.toUpperCase().replace('_', ' ')} (Primary)
-                      </Badge>
+                      {user.role && (
+                        <Badge className={getRoleBadgeColor(user.role)} variant="outline">
+                          {user.role.toUpperCase().replace('_', ' ')} (Primary)
+                        </Badge>
+                      )}
                       {user.roles?.filter(role => role !== user.role).map((role) => (
                         <Badge key={role} className={getRoleBadgeColor(role)} variant="outline">
                           {role.toUpperCase().replace('_', ' ')}
                         </Badge>
                       ))}
+                      {!user.role && !user.roles?.length && (
+                        <Badge variant="secondary">No Role Assigned</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{user.organization || '-'}</TableCell>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -5,13 +6,22 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, ArrowUpDown, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Database, ArrowUpDown, Shield, Plus, X } from 'lucide-react';
+
+interface DestinationIS {
+  id: string;
+  name: string;
+  classification: string;
+}
 
 interface FormData {
   sourceIS: string;
   sourceISClassification: string;
   destinationIS: string;
   destinationISClassification: string;
+  destinationISList?: DestinationIS[];
   mediaDisposition: string;
   overallClassification: string;
   transferType: 'low-to-low' | 'low-to-high' | 'high-to-low' | 'high-to-high' | '';
@@ -27,8 +37,43 @@ interface SourceDestinationStepProps {
 }
 
 export function SourceDestinationStep({ data, updateData }: SourceDestinationStepProps) {
+  const [destinationISList, setDestinationISList] = useState<DestinationIS[]>(
+    data.destinationISList || [
+      { id: '1', name: data.destinationIS || '', classification: data.destinationISClassification || '' }
+    ]
+  );
+
+  useEffect(() => {
+    updateData({ 
+      destinationISList,
+      destinationIS: destinationISList[0]?.name || '',
+      destinationISClassification: destinationISList[0]?.classification || ''
+    });
+  }, [destinationISList, updateData]);
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     updateData({ [field]: value });
+  };
+
+  const addDestinationIS = () => {
+    const newDestination: DestinationIS = {
+      id: Date.now().toString(),
+      name: '',
+      classification: ''
+    };
+    setDestinationISList([...destinationISList, newDestination]);
+  };
+
+  const updateDestinationIS = (id: string, field: keyof DestinationIS, value: string) => {
+    setDestinationISList(destinationISList.map(dest => 
+      dest.id === id ? { ...dest, [field]: value } : dest
+    ));
+  };
+
+  const removeDestinationIS = (id: string) => {
+    if (destinationISList.length > 1) {
+      setDestinationISList(destinationISList.filter(dest => dest.id !== id));
+    }
   };
 
   return (
@@ -78,34 +123,76 @@ export function SourceDestinationStep({ data, updateData }: SourceDestinationSte
             </div>
             
             <div className="space-y-3">
-              <div>
-                <Label htmlFor="destinationIS">Destination IS *</Label>
-                <Input
-                  id="destinationIS"
-                  type="text"
-                  placeholder="Destination Information System"
-                  value={data.destinationIS}
-                  onChange={(e) => handleInputChange('destinationIS', e.target.value)}
-                  required
-                />
+              <div className="flex items-center justify-between">
+                <Label>Destination IS *</Label>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {destinationISList.length} destination{destinationISList.length !== 1 ? 's' : ''}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addDestinationIS}
+                    className="flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Destination
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="destinationISClassification">Destination IS Classification *</Label>
-                <Select
-                  value={data.destinationISClassification}
-                  onValueChange={(value) => handleInputChange('destinationISClassification', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination classification" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unclassified">UNCLASSIFIED</SelectItem>
-                    <SelectItem value="cui">CUI</SelectItem>
-                    <SelectItem value="secret">SECRET</SelectItem>
-                    <SelectItem value="top-secret">TOP SECRET</SelectItem>
-                    <SelectItem value="top-secret-sci">TOP SECRET//SCI</SelectItem>
-                  </SelectContent>
-                </Select>
+              
+              <div className="space-y-4">
+                {destinationISList.map((destination, index) => (
+                  <Card key={destination.id} className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <h4 className="font-medium text-sm">Destination IS {index + 1}</h4>
+                      {destinationISList.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDestinationIS(destination.id)}
+                          className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`destinationIS-${destination.id}`}>Information System *</Label>
+                        <Input
+                          id={`destinationIS-${destination.id}`}
+                          type="text"
+                          placeholder="Destination Information System"
+                          value={destination.name}
+                          onChange={(e) => updateDestinationIS(destination.id, 'name', e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`destinationISClassification-${destination.id}`}>Classification *</Label>
+                        <Select
+                          value={destination.classification}
+                          onValueChange={(value) => updateDestinationIS(destination.id, 'classification', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select classification" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unclassified">UNCLASSIFIED</SelectItem>
+                            <SelectItem value="cui">CUI</SelectItem>
+                            <SelectItem value="secret">SECRET</SelectItem>
+                            <SelectItem value="top-secret">TOP SECRET</SelectItem>
+                            <SelectItem value="top-secret-sci">TOP SECRET//SCI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
               </div>
             </div>
           </div>

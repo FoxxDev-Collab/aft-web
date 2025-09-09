@@ -1,6 +1,4 @@
 import { db } from '../lib/db';
-import { users, userRoles, driveInventory, UserRole } from '../lib/db/schema';
-import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
 async function seedDatabase() {
@@ -10,45 +8,36 @@ async function seedDatabase() {
     const database = db();
     // Demo users for team demo
     const userSeeds = [
-      { email: 'admin@cyber.mil', firstName: 'Admin', lastName: 'User', role: UserRole.ADMIN, organization: 'Cyber Command' },
-      { email: 'daniel.farrel@cyber.mil', firstName: 'Daniel', lastName: 'Farrell', role: UserRole.REQUESTOR, organization: 'Cyber Command' },
-      { email: 'benji.tran@cyber.mil', firstName: 'Benji', lastName: 'Tran', role: UserRole.DTA, organization: 'Cyber Command' },
-      { email: 'joel.haas@cyber.mil', firstName: 'Joel', lastName: 'Haas', role: UserRole.APPROVER, organization: 'Cyber Command' },
-      { email: 'chad.quin@cyber.mil', firstName: 'Chad', lastName: 'Quin', role: UserRole.CPSO, organization: 'Cyber Command' },
-      { email: 'alex.nichols@cyber.mil', firstName: 'Alex', lastName: 'Nichols', role: UserRole.SME, organization: 'Cyber Command' },
-      { email: 'chris.arm@cyber.mil', firstName: 'Chris', lastName: 'Arm', role: UserRole.MEDIA_CUSTODIAN, organization: 'Cyber Command' }
+      { email: 'admin@cyber.mil', firstName: 'Admin', lastName: 'User', role: 'admin', organization: 'Cyber Command' },
+      { email: 'daniel.farrel@cyber.mil', firstName: 'Daniel', lastName: 'Farrell', role: 'requestor', organization: 'Cyber Command' },
+      { email: 'benji.tran@cyber.mil', firstName: 'Benji', lastName: 'Tran', role: 'dta', organization: 'Cyber Command' },
+      { email: 'joel.haas@cyber.mil', firstName: 'Joel', lastName: 'Haas', role: 'approver', organization: 'Cyber Command' },
+      { email: 'chad.quin@cyber.mil', firstName: 'Chad', lastName: 'Quin', role: 'cpso', organization: 'Cyber Command' },
+      { email: 'alex.nichols@cyber.mil', firstName: 'Alex', lastName: 'Nichols', role: 'sme', organization: 'Cyber Command' },
+      { email: 'chris.arm@cyber.mil', firstName: 'Chris', lastName: 'Arm', role: 'media_custodian', organization: 'Cyber Command' }
     ];
 
     for (const userData of userSeeds) {
       // Check if user already exists
-      const existingUser = await database.select().from(users).where(eq(users.email, userData.email)).limit(1);
+      const existingUser = database.prepare('SELECT * FROM users WHERE email = ? LIMIT 1').get(userData.email);
       
-      if (existingUser.length > 0) {
+      if (existingUser) {
         console.log(`⚠️  User already exists: ${userData.email}`);
         continue;
       }
 
       const hashedPassword = await bcrypt.hash('apples@@22', 12);
       
-      const [newUser] = await database.insert(users).values({
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        primaryRole: userData.role,
-        organization: userData.organization,
-        password: hashedPassword,
-        phone: '555-0123',
-        isActive: true,
-      }).returning();
+      const result = database.prepare(`
+        INSERT INTO users (email, firstName, lastName, primaryRole, organization, password, phone, isActive)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(userData.email, userData.firstName, userData.lastName, userData.role, userData.organization, hashedPassword, '555-0123', 1);
 
       // Add primary role to user_roles table
-      await database.insert(userRoles).values({
-        userId: newUser.id,
-        role: userData.role,
-        isActive: true,
-        assignedBy: newUser.id, // Self-assigned for initial setup
-        createdAt: new Date(),
-      });
+      database.prepare(`
+        INSERT INTO user_roles (userId, role, isActive, assignedBy)
+        VALUES (?, ?, ?, ?)
+      `).run(result.lastInsertRowid, userData.role, 1, result.lastInsertRowid);
       
       console.log(`✓ Created ${userData.role}: ${userData.email}`);
     }
@@ -78,25 +67,17 @@ async function seedDatabase() {
 
     for (const driveData of driveSeeds) {
       // Check if drive already exists
-      const existingDrive = await database.select().from(driveInventory).where(eq(driveInventory.serialNumber, driveData.serialNumber)).limit(1);
+      const existingDrive = database.prepare('SELECT * FROM drive_inventory WHERE serialNumber = ? LIMIT 1').get(driveData.serialNumber);
       
-      if (existingDrive.length > 0) {
+      if (existingDrive) {
         console.log(`⚠️  Drive already exists: ${driveData.serialNumber}`);
         continue;
       }
 
-      await database.insert(driveInventory).values({
-        serialNumber: driveData.serialNumber,
-        model: driveData.model,
-        capacity: driveData.capacity,
-        mediaController: driveData.mediaController,
-        mediaType: driveData.mediaType,
-        classification: driveData.classification,
-        status: 'available',
-        notes: 'Demo drive for team testing',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      database.prepare(`
+        INSERT INTO drive_inventory (serialNumber, model, capacity, mediaController, mediaType, classification, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(driveData.serialNumber, driveData.model, driveData.capacity, driveData.mediaController, driveData.mediaType, driveData.classification, 'available', 'Demo drive for team testing');
 
       console.log(`✓ Created ${driveData.mediaType} drive: ${driveData.serialNumber}`);
     }

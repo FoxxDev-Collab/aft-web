@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { DTASelectionStep } from '@/app/requestor/aft-form/dta-selection-step';
 import { MediaControlStep } from '@/app/requestor/aft-form/media-control-step';
 import { SourceDestinationStep } from '@/app/requestor/aft-form/source-destination-step';
 import { FileDetailsStep } from '@/app/requestor/aft-form/file-details-step';
@@ -28,7 +29,17 @@ interface FileEntry {
   description: string;
 }
 
+interface DestinationIS {
+  id: string;
+  name: string;
+  classification: string;
+}
+
 interface FormData {
+  // Step 0: DTA Selection
+  selectedDriveId?: number;
+  dtaSelected: boolean;
+  
   // Section I: Media Control Number and Media Type
   mediaControlNumber: string;
   mediaType: 'CD-R' | 'DVD-R' | 'DVD-RDL' | 'SSD' | 'SSD-T' | '';
@@ -38,6 +49,7 @@ interface FormData {
   sourceISClassification: string;
   destinationIS: string;
   destinationISClassification: string;
+  destinationISList?: DestinationIS[];
   mediaDisposition: string;
   overallClassification: string;
   transferType: 'low-to-low' | 'low-to-high' | 'high-to-low' | 'high-to-high' | '';
@@ -91,6 +103,10 @@ interface RequestData {
 }
 
 const initialFormData: FormData = {
+  // Step 0: DTA Selection
+  selectedDriveId: undefined,
+  dtaSelected: false,
+  
   // Section I
   mediaControlNumber: '',
   mediaType: '',
@@ -100,6 +116,7 @@ const initialFormData: FormData = {
   sourceISClassification: '',
   destinationIS: '',
   destinationISClassification: '',
+  destinationISList: [],
   mediaDisposition: '',
   overallClassification: '',
   transferType: '',
@@ -125,6 +142,7 @@ const initialFormData: FormData = {
 };
 
 const steps = [
+  { title: 'DTA Selection', description: 'Select your Data Transfer Agent' },
   { title: 'Media Control', description: 'Media control number and type' },
   { title: 'Source & Destination', description: 'Information systems and classification' },
   { title: 'File Details', description: 'Files to transfer and justification' },
@@ -146,6 +164,10 @@ export default function EditRequestPage() {
   // Map existing request data to form data structure
   const mapRequestToFormData = (request: RequestData): FormData => {
     return {
+      // DTA Selection - defaults for existing requests
+      selectedDriveId: undefined,
+      dtaSelected: false,
+      
       // Default AFT form values - we'll need to populate these based on existing data
       mediaControlNumber: request.requestNumber || '',
       mediaType: '', // This wasn't in the old structure
@@ -155,6 +177,11 @@ export default function EditRequestPage() {
       sourceISClassification: request.classification || '',
       destinationIS: request.destSystem || '',
       destinationISClassification: request.classification || '',
+      destinationISList: [{ 
+        id: '1', 
+        name: request.destSystem || '', 
+        classification: request.classification || '' 
+      }],
       mediaDisposition: request.destLocation || '',
       overallClassification: request.classification || '',
       transferType: (request.transferType as 'low-to-low' | 'low-to-high' | 'high-to-low' | 'high-to-high') || '',
@@ -246,13 +273,17 @@ export default function EditRequestPage() {
 
   const validateStep = (step: number): boolean => {
     switch (step) {
-      case 0: // Media Control
+      case 0: // DTA Selection
+        return !!(formData.selectedDriveId && formData.dtaSelected);
+      case 1: // Media Control
         return !!(formData.mediaControlNumber && formData.mediaType);
-      case 1: // Source & Destination
-        return !!(formData.sourceIS && formData.sourceISClassification && formData.destinationIS && formData.destinationISClassification && formData.overallClassification && formData.transferType && formData.destinationFile && formData.justificationForTransfer);
-      case 2: // File Details
+      case 2: // Source & Destination
+        return !!(formData.sourceIS && formData.sourceISClassification && formData.destinationISList && formData.destinationISList.length > 0 && formData.destinationISList.every(dest => dest.name && dest.classification) && formData.overallClassification && formData.transferType && formData.destinationFile && formData.justificationForTransfer);
+      case 3: // File Details
         return formData.numberOfFiles > 0 && formData.files.every(file => file.name && file.fileType && file.classification);
-      case 3: // Media Transportation
+      case 4: // File Upload
+        return true; // Optional step
+      case 5: // Media Transportation
         return !formData.mediaTransportedOutside || !!(formData.mediaDestination && formData.destinationPOC && formData.destinationAddress);
       default:
         return true;
@@ -321,16 +352,18 @@ export default function EditRequestPage() {
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <MediaControlStep data={formData} updateData={updateFormData} />;
+        return <DTASelectionStep data={formData} updateData={updateFormData} />;
       case 1:
-        return <SourceDestinationStep data={formData} updateData={updateFormData} />;
+        return <MediaControlStep data={formData} updateData={updateFormData} />;
       case 2:
-        return <FileDetailsStep data={formData} updateData={updateFormData} />;
+        return <SourceDestinationStep data={formData} updateData={updateFormData} />;
       case 3:
-        return <FileUploadStep data={formData} updateData={updateFormData} />;
+        return <FileDetailsStep data={formData} updateData={updateFormData} />;
       case 4:
-        return <MediaTransportationStep data={formData} updateData={updateFormData} />;
+        return <FileUploadStep data={formData} updateData={updateFormData} />;
       case 5:
+        return <MediaTransportationStep data={formData} updateData={updateFormData} />;
+      case 6:
         return <ReviewSubmitStep data={formData} onSubmit={saveRequest} isSubmitting={isSubmitting} />;
       default:
         return null;

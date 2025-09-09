@@ -1,12 +1,7 @@
 import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import * as schema from './schema';
-import { users, UserRole } from './schema';
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
 
-let db: ReturnType<typeof drizzle>;
+let db: Database.Database;
 let initialized = false;
 
 function getDb() {
@@ -30,11 +25,8 @@ function getDb() {
       }
       
       // Initialize SQLite database
-      const sqlite = new Database(dbPath);
-      sqlite.pragma('journal_mode = WAL');
-      
-      // Initialize Drizzle ORM
-      db = drizzle(sqlite, { schema });
+      db = new Database(dbPath);
+      db.pragma('journal_mode = WAL');
       
       // Auto-initialize database with admin user on first access
       if (!initialized) {
@@ -48,26 +40,121 @@ function getDb() {
 
 export { getDb as db };
 
-// Migration function
-export async function runMigrations() {
-  try {
-    const database = getDb();
-    await migrate(database, { migrationsFolder: './drizzle' });
-    console.log('Database migrations completed successfully');
-  } catch (error) {
-    console.error('Migration failed:', error);
-    throw error;
-  }
+// Create database tables
+export function createTables() {
+  const database = getDb();
+  
+  // Create users table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      firstName TEXT NOT NULL,
+      lastName TEXT NOT NULL,
+      primaryRole TEXT NOT NULL,
+      organization TEXT,
+      phone TEXT,
+      isActive BOOLEAN DEFAULT true,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  
+  // Create user_roles table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      role TEXT NOT NULL,
+      isActive BOOLEAN DEFAULT true,
+      assignedBy INTEGER,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (assignedBy) REFERENCES users(id)
+    )
+  `);
+  
+  // Create aft_requests table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS aft_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      requestNumber TEXT UNIQUE NOT NULL,
+      requestorId INTEGER NOT NULL,
+      requestorName TEXT NOT NULL,
+      requestorOrg TEXT NOT NULL,
+      requestorPhone TEXT NOT NULL,
+      requestorEmail TEXT NOT NULL,
+      transferPurpose TEXT NOT NULL,
+      transferType TEXT NOT NULL,
+      classification TEXT NOT NULL,
+      dataDescription TEXT NOT NULL,
+      sourceSystem TEXT,
+      destSystem TEXT,
+      destLocation TEXT,
+      dataFormat TEXT,
+      encryption TEXT,
+      transferMethod TEXT,
+      requestedStartDate TEXT,
+      status TEXT DEFAULT 'draft',
+      rejectionReason TEXT,
+      signatures TEXT DEFAULT '{}',
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (requestorId) REFERENCES users(id)
+    )
+  `);
+  
+  // Create drive_inventory table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS drive_inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      serialNumber TEXT UNIQUE NOT NULL,
+      model TEXT NOT NULL,
+      capacity TEXT NOT NULL,
+      mediaController TEXT UNIQUE NOT NULL,
+      mediaType TEXT NOT NULL,
+      classification TEXT NOT NULL,
+      status TEXT DEFAULT 'available',
+      notes TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  
+  // Create drive_tracking table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS drive_tracking (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      driveId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
+      issuedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expectedReturnAt DATETIME,
+      returnedAt DATETIME,
+      sourceIS TEXT,
+      destinationIS TEXT,
+      mediaType TEXT,
+      notes TEXT,
+      FOREIGN KEY (driveId) REFERENCES drive_inventory(id),
+      FOREIGN KEY (userId) REFERENCES users(id)
+    )
+  `);
+  
+  console.log('Database tables created successfully');
 }
 
 // Initialize database with admin user if not exists
 export async function initializeDatabase() {
   try {
     const database = getDb();
-    // Check if admin user exists
-    const adminUser = await database.select().from(users).where(eq(users.primaryRole, UserRole.ADMIN)).limit(1);
     
-    if (adminUser.length === 0) {
+    // Create tables first
+    createTables();
+    
+    // Check if admin user exists
+    const adminUser = database.prepare('SELECT * FROM users WHERE primaryRole = ? LIMIT 1').get('admin');
+    
+    if (!adminUser) {
       // Get admin credentials from environment variables
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@aft.gov';
       const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -79,16 +166,10 @@ export async function initializeDatabase() {
       // Create default admin user
       const hashedPassword = await bcrypt.hash(adminPassword, 12);
       
-      await database.insert(users).values({
-        email: adminEmail,
-        password: hashedPassword,
-        firstName: adminFirstName,
-        lastName: adminLastName,
-        primaryRole: UserRole.ADMIN,
-        organization: adminOrganization,
-        phone: adminPhone,
-        isActive: true,
-      });
+      database.prepare(`
+        INSERT INTO users (email, password, firstName, lastName, primaryRole, organization, phone, isActive)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(adminEmail, hashedPassword, adminFirstName, adminLastName, 'admin', adminOrganization, adminPhone, 1);
       
       console.log('Default admin user created:');
       console.log(`Email: ${adminEmail}`);
@@ -97,32 +178,26 @@ export async function initializeDatabase() {
 
     // Create test users for approval roles
     const testUsers = [
-      { email: 'dao@aft.gov', role: UserRole.DAO, name: 'David Anderson', title: 'Designated Authorizing Official' },
-      { email: 'issm@aft.gov', role: UserRole.APPROVER, name: 'Jane Smith', title: 'Information System Security Manager' },
-      { email: 'cpso@aft.gov', role: UserRole.CPSO, name: 'Robert Taylor', title: 'Contractor Program Security Officer' },
-      { email: 'dta@aft.gov', role: UserRole.DTA, name: 'Mike Johnson', title: 'Data Transfer Agent' },
-      { email: 'dta2@aft.gov', role: UserRole.DTA, name: 'Lisa Brown', title: 'Data Transfer Agent 2' },
-      { email: 'sme@aft.gov', role: UserRole.SME, name: 'Jennifer Davis', title: 'Subject Matter Expert' },
-      { email: 'custodian@aft.gov', role: UserRole.MEDIA_CUSTODIAN, name: 'Sarah Wilson', title: 'Media Custodian' }
+      { email: 'dao@aft.gov', role: 'dao', name: 'David Anderson', title: 'Designated Authorizing Official' },
+      { email: 'issm@aft.gov', role: 'approver', name: 'Jane Smith', title: 'Information System Security Manager' },
+      { email: 'cpso@aft.gov', role: 'cpso', name: 'Robert Taylor', title: 'Contractor Program Security Officer' },
+      { email: 'dta@aft.gov', role: 'dta', name: 'Mike Johnson', title: 'Data Transfer Agent' },
+      { email: 'dta2@aft.gov', role: 'dta', name: 'Lisa Brown', title: 'Data Transfer Agent 2' },
+      { email: 'sme@aft.gov', role: 'sme', name: 'Jennifer Davis', title: 'Subject Matter Expert' },
+      { email: 'custodian@aft.gov', role: 'media_custodian', name: 'Sarah Wilson', title: 'Media Custodian' }
     ];
 
     for (const testUser of testUsers) {
-      const userCheck = await database.select().from(users).where(eq(users.email, testUser.email)).limit(1);
+      const userCheck = database.prepare('SELECT * FROM users WHERE email = ? LIMIT 1').get(testUser.email);
       
-      if (userCheck.length === 0) {
+      if (!userCheck) {
         const hashedPassword = await bcrypt.hash('password123', 12);
         const [firstName, lastName] = testUser.name.split(' ');
         
-        await database.insert(users).values({
-          email: testUser.email,
-          password: hashedPassword,
-          firstName,
-          lastName,
-          primaryRole: testUser.role,
-          organization: 'AFT System',
-          phone: '555-0000',
-          isActive: true,
-        });
+        database.prepare(`
+          INSERT INTO users (email, password, firstName, lastName, primaryRole, organization, phone, isActive)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(testUser.email, hashedPassword, firstName, lastName, testUser.role, 'AFT System', '555-0000', 1);
         
         console.log(`✓ Test ${testUser.title} user created: ${testUser.email}`);
       } else {
